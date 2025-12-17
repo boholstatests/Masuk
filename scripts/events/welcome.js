@@ -1,6 +1,7 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const { getPrefix } = global.utils;
 
 module.exports = {
   config: {
@@ -10,20 +11,38 @@ module.exports = {
     category: "events"
   },
 
-  onStart: async function ({ api, event }) {
+  onStart: async function ({ api, event, message }) {
     if (event.logMessageType !== "log:subscribe") return;
 
     const { threadID, logMessageData } = event;
-    const newUsers = logMessageData.addedParticipants;
-    const botID = api.getCurrentUserID();
+    const { addedParticipants } = logMessageData;
+    const hours = new Date().getHours();
+    const prefix = getPrefix(threadID);
+    const nickNameBot = global.GoatBot.config.nickNameBot;
 
-    if (newUsers.some(u => u.userFbId === botID)) return;
+    // Bot nick set function
+    if (addedParticipants.some(user => user.userFbId === api.getCurrentUserID())) {
+      if (nickNameBot) {
+        try {
+          await api.changeNickname(nickNameBot, threadID, api.getCurrentUserID());
+        } catch (error) {
+          console.error("❌ Error changing bot nickname:", error);
+        }
+      }
+      // Return early when bot is added
+      return;
+    }
+
+    // Original welcome code for new users
+    const botID = api.getCurrentUserID();
+    
+    if (addedParticipants.some(u => u.userFbId === botID)) return;
 
     const threadInfo = await api.getThreadInfo(threadID);
     const groupName = threadInfo.threadName;
     const memberCount = threadInfo.participantIDs.length;
 
-    for (const user of newUsers) {
+    for (const user of addedParticipants) {
       const userId = user.userFbId;
       const fullName = user.fullName;
 
